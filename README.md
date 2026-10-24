@@ -63,6 +63,10 @@ subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-
 
 未読や送る予定の返信、設定は `data` フォルダに保存しています。会話そのものは Claude Code の `~/.claude` にあり、このアプリは読むだけです。アンインストールは、サーバーを止めてからこのフォルダを消すだけです。
 
+## テスト
+
+`lib/` の変換や版の比較など、表に出ない部分のテストが `test/` にあります。`npm test` で実行できます（Node 付属のテストランナーを使うので、追加のパッケージは要りません）。
+
 ## ライセンス
 
 [MIT](LICENSE)
