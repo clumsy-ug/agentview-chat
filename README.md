@@ -1,6 +1,12 @@
 # Agent View Chat
 
+日本語 | [English](README.en.md)
+
 `claude --bg` で動かしている Claude Code の裏セッション（バックグラウンドセッション）を、チャット UI で見たり返信したりするための Windows 用アプリです。
+
+> **English summary:** A Windows app for viewing and replying to Claude Code background sessions (`claude --bg`) in a chat UI, instead of the terminal agent view. Free and MIT-licensed. Full English README: [README.en.md](README.en.md)
+>
+> Also available as a free skill on Agensi: https://www.agensi.io/skills/agentview-chat
 
 ![ターミナルの agent view と、このアプリで同じ裏セッションを扱っているところ](docs/demo.gif)
 
