@@ -63,6 +63,8 @@ For unattended runs, set `--permission-mode` or your allowed-tools configuration
 
 In Settings you can change the defaults for new background sessions (folder, model, permissions, effort), desktop notifications, key bindings, and appearance. Notifications only appear while the window is open.
 
+The UI language (Japanese / English) can be switched in Settings under "Appearance"; by default it follows your browser language. Conversation content is Claude's replies as they are, in whatever language you use with it.
+
 When a new Claude Code release is available, the app tells you at startup and on a check every 3 hours. Pressing "Update" runs `claude update`. Running background sessions are left as they are, and use the new version from their next reply onward. Automatic updates can also be enabled.
 
 Unread state, queued replies, and settings are stored in the `data` folder. The conversations themselves live in Claude Code's `~/.claude`, and this app only reads them. To uninstall, stop the server and delete this folder.

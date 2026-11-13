@@ -5,6 +5,7 @@ import htm from 'htm';
 import { Markdown } from './md.js';
 import { Icon } from './icons.js';
 import { clock, countLines, dur, firstLine, needsTerminal, relPath } from './util.js';
+import { t, tt } from './i18n.js';
 
 const html = htm.bind(h);
 const SPECIAL = new Set(['AskUserQuestion', 'ExitPlanMode']);
@@ -40,60 +41,60 @@ function diffCount(a, b) {
   return { plus: countLines(b), minus: countLines(a) };
 }
 
-export function toolView(t, cwd) {
-  const i = t.input || {};
+export function toolView(tool, cwd) {
+  const i = tool.input || {};
   const p = (x) => relPath(x, cwd);
-  switch (t.name) {
+  switch (tool.name) {
     case 'Bash':
     case 'PowerShell':
-      return { icon: 'terminal', verb: 'コマンド', target: firstLine(i.command), mono: true, title: i.description || '' };
+      return { icon: 'terminal', verb: t('コマンド'), target: firstLine(i.command), mono: true, title: i.description || '' };
     case 'Read':
-      return { icon: 'file', verb: '読む', target: p(i.file_path) };
+      return { icon: 'file', verb: t('読む'), target: p(i.file_path) };
     case 'Write':
-      return { icon: 'filePlus', verb: '作成', target: p(i.file_path), extra: html`<span class="extra plus">+${countLines(i.content)}</span>` };
+      return { icon: 'filePlus', verb: t('作成'), target: p(i.file_path), extra: html`<span class="extra plus">+${countLines(i.content)}</span>` };
     case 'Edit': {
       const d = diffCount(i.old_string, i.new_string);
-      return { icon: 'pencil', verb: '編集', target: p(i.file_path), extra: html`<span class="extra"><span class="plus">+${d.plus}</span> <span class="minus">−${d.minus}</span></span>` };
+      return { icon: 'pencil', verb: t('編集'), target: p(i.file_path), extra: html`<span class="extra"><span class="plus">+${d.plus}</span> <span class="minus">−${d.minus}</span></span>` };
     }
     case 'MultiEdit':
-      return { icon: 'pencil', verb: '編集', target: p(i.file_path), extra: html`<span class="extra muted">${(i.edits || []).length} か所</span>` };
+      return { icon: 'pencil', verb: t('編集'), target: p(i.file_path), extra: html`<span class="extra muted">${tt(`${(i.edits || []).length} か所`, `${(i.edits || []).length} edits`)}</span>` };
     case 'NotebookEdit':
-      return { icon: 'pencil', verb: '編集', target: p(i.notebook_path) };
+      return { icon: 'pencil', verb: t('編集'), target: p(i.notebook_path) };
     case 'Grep':
-      return { icon: 'search', verb: '検索', target: `${i.pattern ?? ''}${i.path ? `  ·  ${p(i.path)}` : ''}`, mono: true };
+      return { icon: 'search', verb: t('検索'), target: `${i.pattern ?? ''}${i.path ? `  ·  ${p(i.path)}` : ''}`, mono: true };
     case 'Glob':
-      return { icon: 'search', verb: 'ファイルを探す', target: i.pattern, mono: true };
+      return { icon: 'search', verb: t('ファイルを探す'), target: i.pattern, mono: true };
     case 'WebFetch':
-      return { icon: 'globe', verb: '取得', target: i.url };
+      return { icon: 'globe', verb: t('取得'), target: i.url };
     case 'WebSearch':
-      return { icon: 'globe', verb: 'Web 検索', target: i.query };
+      return { icon: 'globe', verb: t('Web 検索'), target: i.query };
     case 'Agent':
     case 'Task':
-      return { icon: 'bot', verb: 'サブエージェント', target: i.description || i.subagent_type || '', extra: t.sub ? html`<span class="extra muted">${t.sub} 手順</span>` : null };
+      return { icon: 'bot', verb: t('サブエージェント'), target: i.description || i.subagent_type || '', extra: tool.sub ? html`<span class="extra muted">${tt(`${tool.sub} 手順`, `${tool.sub} steps`)}</span>` : null };
     case 'TodoWrite': {
       const todos = i.todos || [];
-      return { icon: 'list', verb: 'ToDo', target: `${todos.filter((x) => x.status === 'completed').length}/${todos.length} 完了` };
+      return { icon: 'list', verb: 'ToDo', target: tt(`${todos.filter((x) => x.status === 'completed').length}/${todos.length} 完了`, `${todos.filter((x) => x.status === 'completed').length}/${todos.length} done`) };
     }
     case 'Skill':
-      return { icon: 'book', verb: 'スキル', target: i.skill || i.name || '' };
+      return { icon: 'book', verb: t('スキル'), target: i.skill || i.name || '' };
     case 'ToolSearch':
-      return { icon: 'search', verb: 'ツールを探す', target: i.query || '' };
+      return { icon: 'search', verb: t('ツールを探す'), target: i.query || '' };
     case 'Monitor':
-      return { icon: 'clock', verb: '見張る', target: i.description || i.command || '' };
+      return { icon: 'clock', verb: t('見張る'), target: i.description || i.command || '' };
     default: {
-      if (t.name.startsWith('mcp__')) {
-        const [, server, tool] = t.name.split('__');
-        return { icon: 'plug', verb: server, target: tool };
+      if (tool.name.startsWith('mcp__')) {
+        const [, server, toolName] = tool.name.split('__');
+        return { icon: 'plug', verb: server, target: toolName };
       }
       const v = Object.values(i).find((x) => typeof x === 'string');
-      return { icon: 'wrench', verb: t.name, target: v ? firstLine(v).slice(0, 120) : '' };
+      return { icon: 'wrench', verb: tool.name, target: v ? firstLine(v).slice(0, 120) : '' };
     }
   }
 }
 
 function clipLines(s, n) {
   const lines = String(s ?? '').split('\n');
-  return lines.length > n ? `${lines.slice(0, n).join('\n')}\n…（あと ${lines.length - n} 行）` : lines.join('\n');
+  return lines.length > n ? `${lines.slice(0, n).join('\n')}\n${tt(`…（あと ${lines.length - n} 行）`, `… (${lines.length - n} more lines)`)}` : lines.join('\n');
 }
 
 function DiffView({ path, oldText, newText }) {
@@ -113,7 +114,7 @@ function Todos({ todos }) {
 
 function ResultPre({ r, lines = 80 }) {
   if (!r) return null;
-  if (!r.text?.trim()) return html`<div class="muted" style="font-size:12px">（出力なし）</div>`;
+  if (!r.text?.trim()) return html`<div class="muted" style="font-size:12px">${t('（出力なし）')}</div>`;
   return html`<pre class=${`pre${r.isError ? ' err' : ''}`}>${clipLines(r.text, lines)}</pre>`;
 }
 
@@ -135,7 +136,7 @@ function toolDetail(t, cwd) {
       return html`<${Todos} todos=${i.todos} />`;
     case 'Agent':
     case 'Task':
-      return html`<pre class="pre">${clipLines(i.prompt, 30)}</pre>${t.subLast ? html`<div class="muted" style="font-size:12px">最後の操作: ${t.subLast}</div>` : ''}${t.result ? html`<div class="plan-box"><${Markdown} text=${t.result.text} /></div>` : ''}`;
+      return html`<pre class="pre">${clipLines(i.prompt, 30)}</pre>${t.subLast ? html`<div class="muted" style="font-size:12px">${tt('最後の操作: ', 'Last action: ')}${t.subLast}</div>` : ''}${t.result ? html`<div class="plan-box"><${Markdown} text=${t.result.text} /></div>` : ''}`;
     default:
       return html`<pre class="pre">${JSON.stringify(i, null, 2)}</pre><${ResultPre} r=${t.result} lines=${60} />`;
   }
@@ -171,16 +172,16 @@ function Special({ it, live, waiting }) {
       ${it.answered != null && ans[q.question] == null
         ? html`<div class="a">${it.answered}</div>`
         : ans[q.question] != null || it.result
-        ? html`<div class="a">${ans[q.question] ?? (it.result.isError ? '（答えずに進みました）' : '—')}</div>`
+        ? html`<div class="a">${ans[q.question] ?? (it.result.isError ? t('（答えずに進みました）') : '—')}</div>`
         : live || waiting
-          ? html`<div style="color:var(--amber)">回答待ち${live ? '…' : `（${(q.options || []).map((o) => o.label).join(' / ')}）`}</div>`
-          : html`<div class="muted">（答えないまま進みました）</div>`}
+          ? html`<div style="color:var(--amber)">${t('回答待ち')}${live ? '…' : tt(`（${(q.options || []).map((o) => o.label).join(' / ')}）`, ` (${(q.options || []).map((o) => o.label).join(' / ')})`)}</div>`
+          : html`<div class="muted">${t('（答えないまま進みました）')}</div>`}
     </div>`)}</div>`;
   }
   if (it.name === 'ExitPlanMode') {
-    return html`<div class="plan-box"><div class="card-head" style="color:var(--muted)"><${Icon} n="map" s=${14} /> 計画</div>
+    return html`<div class="plan-box"><div class="card-head" style="color:var(--muted)"><${Icon} n="map" s=${14} /> ${t('計画')}</div>
       <${Markdown} text=${it.input?.plan || ''} />
-      ${it.result && html`<div class="muted" style="font-size:12px;margin-top:6px">${it.result.isError ? '見直しを指示しました' : '承認しました'}</div>`}</div>`;
+      ${it.result && html`<div class="muted" style="font-size:12px;margin-top:6px">${it.result.isError ? t('見直しを指示しました') : t('承認しました')}</div>`}</div>`;
   }
   return null;
 }
@@ -202,7 +203,7 @@ function Part({ p, cwd, live, muted, waiting }) {
 }
 
 function UserMsg({ it }) {
-  return html`<div class="msg-user">${it.images ? html`<div class="imgs"><${Icon} n="image" s=${12} /> 画像 ${it.images} 枚</div>` : ''}${it.text}</div>`;
+  return html`<div class="msg-user">${it.images ? html`<div class="imgs"><${Icon} n="image" s=${12} /> ${tt(`画像 ${it.images} 枚`, `${it.images} image${it.images > 1 ? 's' : ''}`)}</div>` : ''}${it.text}</div>`;
 }
 
 function TurnMeta({ b, tail }) {
@@ -211,7 +212,7 @@ function TurnMeta({ b, tail }) {
   return html`<div class="turn-meta">
     ${b.end?.durationMs != null && html`<span><${Icon} n="clock" s=${12} /> ${dur(b.end.durationMs)}</span>`}
     ${text && html`<button class="copy-btn act" onClick=${() => navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1200); })}>
-      <${Icon} n=${copied ? 'check' : 'copy'} s=${12} /> ${copied ? 'コピーしました' : 'コピー'}</button>`}
+      <${Icon} n=${copied ? 'check' : 'copy'} s=${12} /> ${copied ? t('コピーしました') : t('コピー')}</button>`}
   </div>`;
 }
 
@@ -228,7 +229,7 @@ function Turn({ b, cwd, active, expanded, onToggle, waiting }) {
     ${head.length > 0 && (active
       ? head.map((p) => html`<${Part} key=${p.key} p=${p} cwd=${cwd} live=${true} />`)
       : html`<div class=${`work${expanded ? ' open' : ''}`}>
-          <button class="work-head" onClick=${onToggle}><${Icon} n="chevR" s=${13} cls="chev" /> ${tools} 件の操作${b.end?.durationMs != null ? `（${dur(b.end.durationMs)}）` : ''}</button>
+          <button class="work-head" onClick=${onToggle}><${Icon} n="chevR" s=${13} cls="chev" /> ${tt(`${tools} 件の操作`, `${tools} operations`)}${b.end?.durationMs != null ? tt(`（${dur(b.end.durationMs)}）`, ` (${dur(b.end.durationMs)})`) : ''}</button>
           ${expanded && html`<div class="work-body">${head.map((p) => html`<${Part} key=${p.key} p=${p} cwd=${cwd} muted=${true} />`)}</div>`}
         </div>`)}
     ${tail.map((p) => html`<${Part} key=${p.key} p=${p} cwd=${cwd} live=${active} waiting=${waiting} />`)}
@@ -245,9 +246,9 @@ function WorkingLine({ s, hint }) {
   const needs = s.status === 'needs';
   return html`<div class="working-line">
     ${needs ? html`<${Icon} n="help" s=${14} />` : html`<span class="spinner"></span>`}
-    <span style=${needs ? 'color:var(--amber)' : ''}>${needs ? 'あなたの返事を待っています' : s.activity || '作業中'}</span>
+    <span style=${needs ? 'color:var(--amber)' : ''}>${needs ? t('あなたの返事を待っています') : s.activity || t('作業中')}</span>
     ${s.workStartedAt && html`<span>· ${clock(Date.now() - s.workStartedAt)}</span>`}
-    ${s.bgTasks ? html`<span>· バックグラウンドで ${s.bgTasks} 件</span>` : ''}
+    ${s.bgTasks ? html`<span>· ${tt(`バックグラウンドで ${s.bgTasks} 件`, `${s.bgTasks} in the background`)}</span>` : ''}
     ${!needs && hint && html`<span class="hint">${hint}</span>`}
   </div>`;
 }
@@ -281,11 +282,11 @@ export function Thread({ s, items, draft, cwd, hint, readOnly, waitingLast }) {
     return n;
   });
   return html`<div class="thread" ref=${ref} onScroll=${onScroll}><div class="thread-inner">
-    ${items == null && html`<div class="working-line" style="justify-content:center"><span class="spinner"></span> 会話を読み込んでいます</div>`}
+    ${items == null && html`<div class="working-line" style="justify-content:center"><span class="spinner"></span> ${t('会話を読み込んでいます')}</div>`}
     ${blocks.length > limit && html`<button class="btn ghost sm" style="align-self:center" onClick=${() => {
       stick.current = false;
       setLimit(limit + 30);
-    }}>前の会話を表示（あと ${blocks.length - limit} 回分）</button>`}
+    }}>${tt(`前の会話を表示（あと ${blocks.length - limit} 回分）`, `Show earlier turns (${blocks.length - limit} more)`)}</button>`}
     ${shown.map((b, i) => html`<${Turn} key=${b.key} b=${b} cwd=${cwd} active=${working && i === shown.length - 1} waiting=${readOnly && waitingLast && i === shown.length - 1}
       expanded=${expanded.has(b.key)} onToggle=${() => toggle(b.key)} />`)}
     ${working && draft ? html`<div class="msg-text"><${Markdown} text=${draft} cls="draft-caret" /></div>` : ''}
@@ -334,23 +335,23 @@ export function QuestionCard({ req, onAnswer, compact }) {
   });
   const ready = Object.keys(answers()).length === qs.length;
   return html`<div class="card needs">
-    <div class="card-head"><${Icon} n="help" s=${14} /> 質問があります</div>
+    <div class="card-head"><${Icon} n="help" s=${14} /> ${t('質問があります')}</div>
     ${qs.map((q, qi) => html`<div style=${qi ? 'margin-top:12px' : ''}>
-      <div class="card-q">${q.question}${q.multiSelect ? html`<span class="muted" style="font-weight:400;font-size:12px">（いくつでも）</span>` : ''}</div>
+      <div class="card-q">${q.question}${q.multiSelect ? html`<span class="muted" style="font-weight:400;font-size:12px">${t('（いくつでも）')}</span>` : ''}</div>
       <div class="opts">${(q.options || []).map((o, i) => {
         const v = sel[q.question];
         const on = Array.isArray(v) ? v.includes(o.label) : v === o.label;
         return html`<button class=${`opt${on ? ' on' : ''}`} onClick=${() => choose(q, o.label)}>
           <span class="num">${on && (compact || qi > 0) ? '✓' : i + 1}</span><span class="lbl">${o.label}</span>${o.description ? html`<span class="desc">${o.description}</span>` : ''}</button>`;
       })}</div>
-      <div class="other"><input class="input" placeholder="ほかの答えを書く" value=${other[q.question] || ''}
+      <div class="other"><input class="input" placeholder=${t('ほかの答えを書く')} value=${other[q.question] || ''}
         onInput=${(e) => setOther({ ...other, [q.question]: e.target.value })}
         onKeyDown=${(e) => {
           if (e.key === 'Enter' && !e.isComposing && e.target.value.trim() && single) submit({ [q.question]: e.target.value.trim() });
         }} /></div>
     </div>`)}
     ${!single || Object.values(other).some((v) => v?.trim()) ? html`<div class="card-actions"><span class="grow"></span>
-      <button class="btn primary" disabled=${!ready} onClick=${() => submit(answers())}>回答する</button></div>` : ''}
+      <button class="btn primary" disabled=${!ready} onClick=${() => submit(answers())}>${t('回答する')}</button></div>` : ''}
   </div>`;
 }
 
@@ -367,11 +368,11 @@ export function BgPendingCard({ a, onReply, onTerminal, compact }) {
     return html`<div class="cards"><${QuestionCard} req=${req} onAnswer=${onAnswer} compact=${compact} /></div>`;
   }
   if (!needsTerminal(a)) return null;
-  const t = a.pendingTool;
-  const plan = t?.name === 'ExitPlanMode';
+  const pt = a.pendingTool;
+  const plan = pt?.name === 'ExitPlanMode';
   return html`<div class="cards"><div class="card needs">
-    <div class="card-head"><${Icon} n=${plan ? 'map' : 'shield'} s=${14} /> ${plan ? '計画の承認を待っています' : `確認を待っています${t ? ` · ${t.brief}` : ''}`}</div>
-    <div class="muted" style="font-size:12.5px">許可や計画の承認は、ターミナルの画面（claude attach）でしか答えられません。ここに書いて送ると、止めてから指示として続けます。</div>
-    <div class="card-actions"><button class="btn primary" onClick=${onTerminal}><${Icon} n="terminal" s=${14} /> ターミナルで開いて答える</button></div>
+    <div class="card-head"><${Icon} n=${plan ? 'map' : 'shield'} s=${14} /> ${plan ? t('計画の承認を待っています') : `${t('確認を待っています')}${pt ? ` · ${pt.brief}` : ''}`}</div>
+    <div class="muted" style="font-size:12.5px">${tt('許可や計画の承認は、ターミナルの画面（claude attach）でしか答えられません。ここに書いて送ると、止めてから指示として続けます。', 'Permissions and plan approvals can only be answered in the terminal (claude attach). If you write and send here instead, the session is stopped and your text continues it as an instruction.')}</div>
+    <div class="card-actions"><button class="btn primary" onClick=${onTerminal}><${Icon} n="terminal" s=${14} /> ${t('ターミナルで開いて答える')}</button></div>
   </div></div>`;
 }

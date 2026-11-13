@@ -1,4 +1,6 @@
-// キー操作の既定（mod = Ctrl）
+// キー操作の既定（mod = Ctrl）。label / group / note は表示時に t() で引く
+import { t } from './i18n.js';
+
 export const COMMANDS = [
   { id: 'composer.send', label: '送信', def: 'mod+enter', when: 'composer', group: '入力欄' },
   { id: 'composer.steer', label: '作業を止めて、今すぐ送る', def: 'mod+shift+enter', when: 'composer', group: '入力欄', note: '作業中に送ると、ふつうは今の作業が終わってから送ります' },
@@ -44,7 +46,7 @@ export function comboParts(combo) {
   if (!combo) return [];
   return combo.split('+').filter(Boolean).map((p) => LABEL[p] ?? (p.length === 1 ? p.toUpperCase() : p[0].toUpperCase() + p.slice(1)));
 }
-export const comboText = (combo) => comboParts(combo).join(' + ') || '未設定';
+export const comboText = (combo) => comboParts(combo).join(' + ') || t('未設定');
 
 export function bindingsOf(settings) {
   const out = {};

@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { BgSessions } from './lib/bg.mjs';
 import { cleanEnv, findGlobalClaude } from './lib/env.mjs';
 import { Updater } from './lib/updater.mjs';
+import { tl } from './lib/i18n.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC = path.join(ROOT, 'public');
@@ -31,7 +32,7 @@ if (!/^[0-9a-f]{48}$/.test(TOKEN || '')) {
 const SETTINGS_FILE = path.join(DATA, 'settings.json');
 const downloads = path.join(os.homedir(), 'Downloads');
 const DEFAULT_SETTINGS = {
-  theme: 'dark', fontSize: 14, chatWidth: 'comfortable', notify: false, autoUpdate: false,
+  theme: 'dark', fontSize: 14, chatWidth: 'comfortable', notify: false, autoUpdate: false, lang: '',
   defaults: { cwd: fs.existsSync(downloads) ? downloads : os.homedir(), model: '', mode: '', effort: '' },
   keybindings: {},
 };
@@ -46,6 +47,10 @@ function saveSettings() {
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 1));
 }
 
+// サーバー側の文言の言語。設定があればそれ、無ければ画面が知らせてきた言語
+let clientLang = '';
+const uiLang = () => settings.lang || clientLang || 'ja';
+
 // ~/.claude/settings.json の既定（表示用。読むだけ）
 function claudeDefaults() {
   try {
@@ -59,8 +64,8 @@ function claudeDefaults() {
 // ---- 中身 ----
 const childEnv = cleanEnv();
 const claude = findGlobalClaude();
-const bg = new BgSessions({ claude, env: childEnv, dataDir: DATA, onlyCwd: process.env.AVC_ONLY_CWD || '' });
-const updater = new Updater({ claude, env: childEnv, dataDir: DATA, getSettings: () => settings });
+const bg = new BgSessions({ claude, env: childEnv, dataDir: DATA, onlyCwd: process.env.AVC_ONLY_CWD || '', getLang: uiLang });
+const updater = new Updater({ claude, env: childEnv, dataDir: DATA, getSettings: () => settings, getLang: uiLang });
 
 // ---- SSE ----
 const clients = new Set();
@@ -136,7 +141,7 @@ function readBody(req) {
     req.on('data', (c) => {
       size += c.length;
       if (size > 4 << 20) {
-        reject(Object.assign(new Error('大きすぎます'), { status: 413 }));
+        reject(Object.assign(new Error(tl(uiLang(), '大きすぎます')), { status: 413 }));
         req.destroy();
       } else chunks.push(c);
     });
@@ -144,7 +149,7 @@ function readBody(req) {
       try {
         resolve(chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : {});
       } catch {
-        reject(Object.assign(new Error('JSON が読めません'), { status: 400 }));
+        reject(Object.assign(new Error(tl(uiLang(), 'JSON が読めません')), { status: 400 }));
       }
     });
     req.on('error', reject);
@@ -174,7 +179,7 @@ route('POST', '/api/bg/:id/stop', async ({ p }) => (await bg.stop(idOf(p)), { ok
 route('POST', '/api/bg/:id/remove', async ({ p }) => (await bg.remove(idOf(p)), { ok: true }));
 route('POST', '/api/bg/:id/terminal', async ({ p }) => (await bg.terminal(idOf(p)), { ok: true }));
 route('POST', '/api/open-folder', ({ body }) => {
-  if (!bg.raw.some((a) => a.cwd === body.dir)) throw Object.assign(new Error('知らないフォルダです'), { status: 400 });
+  if (!bg.raw.some((a) => a.cwd === body.dir)) throw Object.assign(new Error(tl(uiLang(), '知らないフォルダです')), { status: 400 });
   spawn('explorer.exe', [body.dir], { detached: true, stdio: 'ignore' }).unref();
   return { ok: true };
 });
@@ -216,6 +221,8 @@ const server = http.createServer(async (req, res) => {
     if (req.headers.origin && !okOrigin(req.headers.origin)) return send(res, 403, { error: 'origin' });
   }
   if (p === '/api/events') {
+    const l = url.searchParams.get('lang');
+    if (l === 'ja' || l === 'en') clientLang = l;
     res.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-store', connection: 'keep-alive' });
     res.write(`event: hello\ndata: ${JSON.stringify(state())}\n\n`);
     clients.add(res);

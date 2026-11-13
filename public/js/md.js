@@ -2,6 +2,7 @@ import { h } from 'preact';
 import { Marked } from 'marked';
 import DOMPurify from 'dompurify';
 import hljs from 'hljs';
+import { t } from './i18n.js';
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
@@ -16,7 +17,7 @@ marked.use({
       } catch {
         body = esc(text);
       }
-      return `<div class="codeblock"><div class="cb-head"><span>${esc(l || 'text')}</span><button class="copy-btn" data-copy="1">コピー</button></div><pre><code>${body}</code></pre></div>`;
+      return `<div class="codeblock"><div class="cb-head"><span>${esc(l || 'text')}</span><button class="copy-btn" data-copy="1">${t('コピー')}</button></div><pre><code>${body}</code></pre></div>`;
     },
   },
 });
@@ -58,7 +59,7 @@ document.addEventListener('click', (e) => {
   if (!btn) return;
   const code = btn.closest('.codeblock')?.querySelector('code')?.innerText ?? '';
   navigator.clipboard.writeText(code).then(() => {
-    btn.textContent = 'コピーしました';
-    setTimeout(() => (btn.textContent = 'コピー'), 1400);
+    btn.textContent = t('コピーしました');
+    setTimeout(() => (btn.textContent = t('コピー')), 1400);
   });
 });

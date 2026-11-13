@@ -1,3 +1,5 @@
+import { getLang, tt } from './i18n.js';
+
 const TOKEN = document.querySelector('meta[name="avc-token"]').content;
 
 export async function api(path, body) {
@@ -10,7 +12,7 @@ export async function api(path, body) {
     j = await r.json();
   } catch {}
   if (r.status === 403 && j?.error === 'token') location.reload();
-  if (!r.ok) throw new Error(j?.error || `エラー ${r.status}`);
+  if (!r.ok) throw new Error(j?.error || tt(`エラー ${r.status}`, `Error ${r.status}`));
   return j;
 }
 
@@ -18,7 +20,7 @@ export async function api(path, body) {
 export function connect(handlers, onStatus) {
   let retry = 0;
   const open = () => {
-    const es = new EventSource(`/api/events?token=${TOKEN}`);
+    const es = new EventSource(`/api/events?token=${TOKEN}&lang=${getLang()}`);
     es.onopen = () => {
       retry = 0;
       onStatus(true);

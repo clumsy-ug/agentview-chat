@@ -10,7 +10,8 @@ import { Menu, Palette, SettingsDialog, Toasts } from './dialogs.js';
 import { UpdateDialog, onUpdate } from './update.js';
 import { Icon } from './icons.js';
 import { COMMANDS, bindingsOf, comboOf, comboParts, comboText } from './keys.js';
-import { MODELS, STATUS_LABEL, basename, bgStatus, needsTerminal, plainPreview } from './util.js';
+import { MODELS, basename, bgStatus, needsTerminal, plainPreview, statusLabel } from './util.js';
+import { resolveLang, setLang, t, tt } from './i18n.js';
 
 const html = htm.bind(h);
 const openBg = () => (store.state.open?.startsWith('b:') ? bgByKey(store.state.open) : null);
@@ -38,28 +39,28 @@ const act = {
   async dispatch(text) {
     const d = store.state.newDraft;
     const r = await api('/api/bg', { cwd: d.cwd, text, model: d.model, mode: d.mode, effort: d.effort });
-    toast(`裏セッション ${r.id} を始めました（claude --bg）`);
+    toast(tt(`裏セッション ${r.id} を始めました（claude --bg）`, `Started background session ${r.id} (claude --bg)`));
     act.open(`b:${r.id}`);
   },
   // 作業中なら、今の作業が終わってから送る（now なら止めて今すぐ）
   async reply(a, text, now = false) {
     const r = await api(`/api/bg/${encodeURIComponent(a.id)}/reply`, { text, now });
-    if (r.queued) toast('今の作業が終わったら送ります');
+    if (r.queued) toast(tt('今の作業が終わったら送ります', 'Will send when the current work finishes'));
   },
   async stop(a) {
     try {
       await api(`/api/bg/${encodeURIComponent(a.id)}/stop`, {});
-      toast('止めました（会話は残っています。返信すると続きから動きます）');
+      toast(tt('止めました（会話は残っています。返信すると続きから動きます）', 'Stopped (the conversation stays. Reply to resume it)'));
     } catch (e) {
       toast(e.message, 'error');
     }
   },
   remove(a) {
-    store.set({ confirm: { text: `「${a.title}」を一覧から消しますか？（claude rm。worktree も消えます）`, ok: '消す', run: async () => {
+    store.set({ confirm: { text: tt(`「${a.title}」を一覧から消しますか？（claude rm。worktree も消えます）`, `Remove "${a.title}" from the list? (claude rm; its worktree is deleted too)`), ok: t('消す'), run: async () => {
       try {
         await api(`/api/bg/${encodeURIComponent(a.id)}/remove`, {});
         if (store.state.open === keyOf(a)) store.set({ open: null });
-        toast('消しました');
+        toast(t('消しました'));
       } catch (e) {
         toast(e.message, 'error');
       }
@@ -68,7 +69,7 @@ const act = {
   async terminal(a) {
     try {
       await api(`/api/bg/${encodeURIComponent(a.id)}/terminal`, {});
-      toast(`ターミナルで開きました（claude attach ${a.id}）`);
+      toast(tt(`ターミナルで開きました（claude attach ${a.id}）`, `Opened in the terminal (claude attach ${a.id})`));
     } catch (e) {
       toast(e.message, 'error');
     }
@@ -89,6 +90,7 @@ async function saveSettings(patch) {
 
 function applySettings(s) {
   if (!s) return;
+  setLang(resolveLang(s.lang));
   const dark = s.theme === 'dark' || (s.theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
   const root = document.documentElement;
   root.classList.toggle('dark', dark);
@@ -100,7 +102,7 @@ function notifyDesktop(n) {
   const st = store.state;
   if (!st.settings?.notify || !('Notification' in window) || Notification.permission !== 'granted') return;
   if (document.visibilityState === 'visible' && document.hasFocus()) return;
-  const head = n.kind === 'needs' ? '入力待ち' : n.kind === 'error' ? 'エラー' : '完了';
+  const head = n.kind === 'needs' ? t('入力待ち') : n.kind === 'error' ? t('エラー') : t('完了');
   const note = new Notification(`${head}: ${n.title}`, { body: plainPreview(n.text, 140), tag: `avc-${n.id}`, icon: '/icon.svg' });
   note.onclick = () => {
     window.focus();
@@ -150,7 +152,7 @@ function run(id) {
     }
     case 'session.nextNeeds': {
       const keys = orderedKeys(st).filter((k) => bgByKey(k)?.group === 'needs');
-      if (!keys.length) return toast('入力待ちの裏セッションはありません');
+      if (!keys.length) return toast(t('入力待ちの裏セッションはありません'));
       const i = keys.indexOf(st.open);
       return act.open(keys[(i + 1) % keys.length]);
     }
@@ -230,7 +232,7 @@ function onKey(e) {
 
 // ---- 画面 ----
 function SidebarToggle() {
-  return store.state.sidebarHidden ? html`<button class="icon-btn" title="一覧を出す" onClick=${() => store.set({ sidebarHidden: false })}><${Icon} n="sidebar" /></button>` : null;
+  return store.state.sidebarHidden ? html`<button class="icon-btn" title=${t('一覧を出す')} onClick=${() => store.set({ sidebarHidden: false })}><${Icon} n="sidebar" /></button>` : null;
 }
 
 function BgHeader({ a }) {
@@ -238,18 +240,18 @@ function BgHeader({ a }) {
   return html`<div class="header">
     <${SidebarToggle} />
     <span class="title" title=${a.title}>${a.title}</span>
-    ${STATUS_LABEL[v] && html`<span class=${`pill ${v}`}>${v === 'working' || v === 'sending' ? html`<span class="spinner"></span>` : ''}${STATUS_LABEL[v]}</span>`}
-    <button class="chip" title=${`${a.cwd}（クリックでフォルダを開く）`} onClick=${() => act.openFolder(a.cwd)}><${Icon} n="folder" s=${13} /><span>${basename(a.cwd)}</span></button>
-    <span class="tag mono" title="ターミナルの agent view（claude agents）と同じ裏セッション">claude --bg · ${a.id}</span>
-    ${a.bgBusy && html`<span class="tag" title="回答は終わっていて、run_in_background などのコマンドだけが動いています">裏でコマンド実行中</span>`}
+    ${statusLabel(v) && html`<span class=${`pill ${v}`}>${v === 'working' || v === 'sending' ? html`<span class="spinner"></span>` : ''}${statusLabel(v)}</span>`}
+    <button class="chip" title=${tt(`${a.cwd}（クリックでフォルダを開く）`, `${a.cwd} (click to open the folder)`)} onClick=${() => act.openFolder(a.cwd)}><${Icon} n="folder" s=${13} /><span>${basename(a.cwd)}</span></button>
+    <span class="tag mono" title=${tt('ターミナルの agent view（claude agents）と同じ裏セッション', 'The same background session as the terminal agent view (claude agents)')}>claude --bg · ${a.id}</span>
+    ${a.bgBusy && html`<span class="tag" title=${tt('回答は終わっていて、run_in_background などのコマンドだけが動いています', 'The reply is done; only commands such as run_in_background are still running')}>${t('裏でコマンド実行中')}</span>`}
     <span class="grow"></span>
-    <button class="btn ghost sm" title=${`claude attach ${a.id}`} onClick=${() => act.terminal(a)}><${Icon} n="terminal" s=${14} /> ターミナルで開く</button>
-    <button class="icon-btn" title="その他" onClick=${(e) => openMenu(e, [
-      { label: '止める（claude stop）', icon: 'stop', desc: '会話は残ります。返信すると続きから動きます', disabled: a.group !== 'working' && a.group !== 'needs', onSelect: () => act.stop(a) },
-      { label: 'フォルダを開く', icon: 'folder', onSelect: () => act.openFolder(a.cwd) },
-      { label: 'ID をコピー', icon: 'copy', onSelect: () => navigator.clipboard.writeText(a.id).then(() => toast('コピーしました')) },
+    <button class="btn ghost sm" title=${`claude attach ${a.id}`} onClick=${() => act.terminal(a)}><${Icon} n="terminal" s=${14} /> ${t('ターミナルで開く')}</button>
+    <button class="icon-btn" title=${t('その他')} onClick=${(e) => openMenu(e, [
+      { label: t('止める（claude stop）'), icon: 'stop', desc: t('会話は残ります。返信すると続きから動きます'), disabled: a.group !== 'working' && a.group !== 'needs', onSelect: () => act.stop(a) },
+      { label: t('フォルダを開く'), icon: 'folder', onSelect: () => act.openFolder(a.cwd) },
+      { label: t('ID をコピー'), icon: 'copy', onSelect: () => navigator.clipboard.writeText(a.id).then(() => toast(t('コピーしました'))) },
       'sep',
-      { label: '一覧から消す（claude rm）', icon: 'archive', onSelect: () => act.remove(a) },
+      { label: t('一覧から消す（claude rm）'), icon: 'archive', onSelect: () => act.remove(a) },
     ], 'right')}><${Icon} n="more" /></button>
   </div>`;
 }
@@ -257,9 +259,9 @@ function BgHeader({ a }) {
 function QueueCard({ a }) {
   if (!a.queue?.length) return null;
   return html`<div class="cards"><div class="card">
-    <div class="card-head" style="color:var(--muted)"><${Icon} n="clock" s=${14} /> 今の作業が終わったら送ります</div>
-    ${a.queue.map((t) => html`<div class="queue-item">${t}</div>`)}
-    <div class="card-actions"><span class="grow"></span><button class="btn sm" onClick=${() => act.cancelQueue(a)}>取り消す</button></div>
+    <div class="card-head" style="color:var(--muted)"><${Icon} n="clock" s=${14} /> ${tt('今の作業が終わったら送ります', 'Will send when the current work finishes')}</div>
+    ${a.queue.map((x) => html`<div class="queue-item">${x}</div>`)}
+    <div class="card-actions"><span class="grow"></span><button class="btn sm" onClick=${() => act.cancelQueue(a)}>${t('取り消す')}</button></div>
   </div></div>`;
 }
 
@@ -286,19 +288,19 @@ function BgView({ a }) {
     if (a.unread && document.visibilityState === 'visible') api(`/api/bg/${encodeURIComponent(a.id)}/read`, {}).catch(() => {});
   }, [a.id, a.unread]);
   const s = { id: a.id, status: v === 'sending' ? 'working' : v === 'needs' || v === 'working' ? v : 'idle',
-    activity: v === 'sending' ? '返信を送っています（裏セッションを止めて、同じ ID で起こしています）' : a.activity, workStartedAt: v === 'working' ? (a.turnAt ?? a.changedAt) : null };
+    activity: v === 'sending' ? tt('返信を送っています（裏セッションを止めて、同じ ID で起こしています）', 'Sending the reply (stopping the session and resuming it with the same ID)') : a.activity, workStartedAt: v === 'working' ? (a.turnAt ?? a.changedAt) : null };
   return html`<div class="main">
     <${BgHeader} a=${a} />
     <${Thread} s=${s} items=${st.items[key]} cwd=${a.cwd}
-      hint=${html`<span class="kbd-group">${comboParts(b['session.interrupt']).map((p) => html`<kbd>${p}</kbd>`)}</span> で止める`} />
+      hint=${html`<span class="kbd-group">${comboParts(b['session.interrupt']).map((p) => html`<kbd>${p}</kbd>`)}</span>${tt(' で止める', ' to stop')}`} />
     <div class="composer-wrap">
-      <${Composer} id=${a.id} working=${v === 'working'} bindings=${b} autoFocus=${true} stopTitle="止める（claude stop）"
-        placeholder=${v === 'working' ? '追加の指示（今の作業が終わったら送ります）' : v === 'needs' && a.question?.length ? '上の質問に答えるか、ここに書いて返す' : needsTerminal(a) ? 'ここに書いて送ると、止めてから指示として続けます' : v === 'sending' ? '送っています…' : '返信する（止まっている裏セッションを、同じ ID のまま起こして続けます）'}
+      <${Composer} id=${a.id} working=${v === 'working'} bindings=${b} autoFocus=${true} stopTitle=${t('止める（claude stop）')}
+        placeholder=${v === 'working' ? tt('追加の指示（今の作業が終わったら送ります）', 'More instructions (sent when the current work finishes)') : v === 'needs' && a.question?.length ? tt('上の質問に答えるか、ここに書いて返す', 'Answer the question above, or write a reply here') : needsTerminal(a) ? tt('ここに書いて送ると、止めてから指示として続けます', 'Writing here stops the session and continues it with your text as an instruction') : v === 'sending' ? tt('送っています…', 'Sending…') : tt('返信する（止まっている裏セッションを、同じ ID のまま起こして続けます）', 'Reply (resumes the stopped session with the same ID)')}
         cards=${html`${a.lastError && html`<div class="msg-note error" style="margin-bottom:8px">${a.lastError}</div>`}<${QueueCard} a=${a} />
-          ${a.bgBusy && v !== 'working' && v !== 'sending' && html`<div class="msg-note" style="margin-bottom:8px">裏でコマンドが動いています（回答は終わっています）。返信してもコマンドは止まらず、Claude はそのまま終わるのを待ちます。</div>`}
-          <${BgPendingCard} a=${a} onReply=${(t) => replyOrToast(a, t)} onTerminal=${() => act.terminal(a)} />`}
-        hint=${v === 'working' ? '' : '返信は claude --bg --resume で送ります（同じ裏セッションのまま）'}
-        onSend=${(t, now) => act.reply(a, t, now)} onInterrupt=${() => act.stop(a)} />
+          ${a.bgBusy && v !== 'working' && v !== 'sending' && html`<div class="msg-note" style="margin-bottom:8px">${tt('裏でコマンドが動いています（回答は終わっています）。返信してもコマンドは止まらず、Claude はそのまま終わるのを待ちます。', 'A command is running in the background (the reply is done). Replying does not stop the command; Claude will keep waiting for it to finish.')}</div>`}
+          <${BgPendingCard} a=${a} onReply=${(x) => replyOrToast(a, x)} onTerminal=${() => act.terminal(a)} />`}
+        hint=${v === 'working' ? '' : tt('返信は claude --bg --resume で送ります（同じ裏セッションのまま）', 'Replies are sent with claude --bg --resume (same background session)')}
+        onSend=${(x, now) => act.reply(a, x, now)} onInterrupt=${() => act.stop(a)} />
     </div>
   </div>`;
 }
@@ -316,15 +318,15 @@ function NewSessionView() {
   }, [picking]);
   const set = (p) => store.set({ newDraft: { ...store.state.newDraft, ...p } });
   return html`<div class="main">
-    <div class="header"><${SidebarToggle} /><span class="title">新しい裏セッション</span></div>
+    <div class="header"><${SidebarToggle} /><span class="title">${t('新しい裏セッション')}</span></div>
     <div class="new-hero">
-      <h1>裏で何を頼みますか？</h1>
-      <p>フォルダを選んで書くと、<span class="mono">claude --bg</span> で裏で動きます。このアプリやターミナルを閉じても止まらず、ターミナルの agent view（<span class="mono">claude agents</span>）にも出ます。</p>
+      <h1>${tt('裏で何を頼みますか？', 'What should run in the background?')}</h1>
+      <p>${tt('フォルダを選んで書くと、', 'Pick a folder, write what you want, and it runs in the background with ')}<span class="mono">claude --bg</span>${tt(' で裏で動きます。このアプリやターミナルを閉じても止まらず、ターミナルの agent view（', '. It keeps running even if you close this app or the terminal, and it also appears in the terminal agent view (')}<span class="mono">claude agents</span>${tt('）にも出ます。', ').')}</p>
       <div class="composer-wrap">
-        <${Composer} id="new" working=${false} bindings=${b} autoFocus=${true} placeholder=${`Claude に頼むこと（${comboText(b['composer.send'])} で裏で開始）`}
+        <${Composer} id="new" working=${false} bindings=${b} autoFocus=${true} placeholder=${tt(`Claude に頼むこと（${comboText(b['composer.send'])} で裏で開始）`, `What to ask Claude (${comboText(b['composer.send'])} to start in the background)`)}
           bar=${html`<span style="position:relative;display:inline-flex">
               <button class=${`cbtn${picking ? ' on' : ''}`} title=${d.cwd} onMouseDown=${(e) => e.stopPropagation()} onClick=${() => setPicking(!picking)}>
-                <${Icon} n="folder" s=${14} /><span>${basename(d.cwd) || 'フォルダを選ぶ'}</span><${Icon} n="chevD" s=${12} /></button>
+                <${Icon} n="folder" s=${14} /><span>${basename(d.cwd) || t('フォルダを選ぶ')}</span><${Icon} n="chevD" s=${12} /></button>
               ${picking && html`<${FolderPicker} value=${d.cwd} onPick=${(cwd) => set({ cwd })} onClose=${() => setPicking(false)} />`}
             </span>
             <${OptionButtons} opts=${d} set=${set} models=${MODELS} defaults=${st.claudeDefaults} />`}
@@ -342,15 +344,15 @@ function EmptyView() {
   const b = bindingsOf(store.state.settings);
   const keys = (id) => html`<span class="kbd-group">${comboParts(b[id]).map((p) => html`<kbd>${p}</kbd>`)}</span>`;
   return html`<div class="main"><div class="header"><${SidebarToggle} /></div><div class="empty"><div class="empty-inner">
-    <div class="empty-title">claude --bg の裏セッションを、チャット画面で</div>
-    <div class="empty-sub">ターミナルの agent view（claude agents）と同じ裏セッションです。左の一覧にマウスを乗せると中身をのぞけて（peek）、クリックで開いてそのまま返信できます。</div>
+    <div class="empty-title">${tt('claude --bg の裏セッションを、チャット画面で', 'Background sessions (claude --bg), in a chat window')}</div>
+    <div class="empty-sub">${tt('ターミナルの agent view（claude agents）と同じ裏セッションです。左の一覧にマウスを乗せると中身をのぞけて（peek）、クリックで開いてそのまま返信できます。', 'The same background sessions as the terminal agent view (claude agents). Hover over the list on the left to peek inside, click to open and reply right there.')}</div>
     <div class="shortcuts">
-      <div>${keys('chat.new')}</div><div>新しい裏セッション</div>
-      <div>${keys('palette.toggle')}</div><div>裏セッションを探す</div>
-      <div>${keys('composer.send')}</div><div>送信</div>
-      <div>${keys('session.nextNeeds')}</div><div>入力待ちの裏セッションへ</div>
-      <div><span class="kbd-group"><kbd>Alt</kbd><kbd>↑</kbd><kbd>↓</kbd></span></div><div>前後の裏セッション</div>
-      <div>${keys('settings.open')}</div><div>設定（キー操作も変えられます）</div>
+      <div>${keys('chat.new')}</div><div>${t('新しい裏セッション')}</div>
+      <div>${keys('palette.toggle')}</div><div>${t('裏セッションを探す')}</div>
+      <div>${keys('composer.send')}</div><div>${t('送信')}</div>
+      <div>${keys('session.nextNeeds')}</div><div>${t('入力待ちの裏セッションへ')}</div>
+      <div><span class="kbd-group"><kbd>Alt</kbd><kbd>↑</kbd><kbd>↓</kbd></span></div><div>${t('前後の裏セッション')}</div>
+      <div>${keys('settings.open')}</div><div>${t('設定（キー操作も変えられます）')}</div>
     </div>
   </div></div></div>`;
 }
@@ -361,7 +363,7 @@ function Confirm() {
     <div class="card" style="width:min(440px,90vw);padding:18px" onMouseDown=${(e) => e.stopPropagation()}>
       <div style="margin-bottom:14px">${c.text}</div>
       <div class="card-actions" style="justify-content:flex-end">
-        <button class="btn" onClick=${() => store.set({ confirm: null })}>やめる</button>
+        <button class="btn" onClick=${() => store.set({ confirm: null })}>${t('やめる')}</button>
         <button class="btn primary" onClick=${() => {
           store.set({ confirm: null });
           c.run();
@@ -382,7 +384,7 @@ function App() {
   useEffect(() => {
     document.title = needs ? `(${needs}) Agent View` : 'Agent View';
   }, [needs]);
-  if (!st.ready) return html`<div class="empty" style="height:100vh"><div class="working-line"><span class="spinner"></span> 接続しています…</div></div>`;
+  if (!st.ready) return html`<div class="empty" style="height:100vh"><div class="working-line"><span class="spinner"></span> ${t('接続しています…')}</div></div>`;
   const b = bindingsOf(st.settings);
   const a = openBg();
   let main;

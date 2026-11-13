@@ -9,7 +9,8 @@ import { api } from './api.js';
 import { comboText } from './keys.js';
 import { BgPendingCard } from './chat.js';
 import { Composer } from './composer.js';
-import { STATUS_LABEL, ago, basename, bgStatus, needsTerminal, plainPreview, waitText } from './util.js';
+import { ago, basename, bgStatus, needsTerminal, plainPreview, statusLabel, waitText } from './util.js';
+import { t, tt } from './i18n.js';
 import { UpdatePill } from './update.js';
 
 const html = htm.bind(h);
@@ -61,11 +62,11 @@ export function whatOf(a) {
     if (needsTerminal(a)) return [waitText(a.waitingFor), a.needs].filter(Boolean).join('：');
     return plainPreview(a.lastText, 120) || waitText(a.waitingFor);
   }
-  if (v === 'sending') return '返信を送っています';
-  if (v === 'working') return `${a.activity || '作業中'}${a.queue?.length ? `（送る予定 ${a.queue.length} 件）` : ''}`;
-  if (v === 'error') return a.lastError || 'エラーで止まりました';
+  if (v === 'sending') return t('返信を送っています');
+  if (v === 'working') return `${a.activity || t('作業中')}${a.queue?.length ? tt(`（送る予定 ${a.queue.length} 件）`, ` (${a.queue.length} queued)`) : ''}`;
+  if (v === 'error') return a.lastError || t('エラーで止まりました');
   const last = plainPreview(a.lastText, 120) || plainPreview(a.lastUser, 120);
-  return a.bgBusy ? `裏でコマンドが動いています · ${last}` : last;
+  return a.bgBusy ? tt(`裏でコマンドが動いています · ${last}`, `A command is running in the background · ${last}`) : last;
 }
 
 function Row({ a, onOpen }) {
@@ -100,28 +101,28 @@ export function Sidebar({ onOpen, onNew, bindings }) {
   return html`<aside class="sidebar">
     <div class="sb-head">
       <div class="brand"><img src="/icon.svg" alt="" /><span>Agent View</span><span class="brand-sub">claude --bg</span></div>
-      <button class="icon-btn" title=${`一覧を隠す（${comboText(bindings['sidebar.toggle'])}）`} onClick=${() => store.set({ sidebarHidden: true })}><${Icon} n="sidebar" s=${16} /></button>
+      <button class="icon-btn" title=${tt(`一覧を隠す（${comboText(bindings['sidebar.toggle'])}）`, `Hide the list (${comboText(bindings['sidebar.toggle'])})`)} onClick=${() => store.set({ sidebarHidden: true })}><${Icon} n="sidebar" s=${16} /></button>
     </div>
-    <button class="btn primary sb-new" onClick=${onNew}><${Icon} n="plus" s=${15} /> 新しい裏セッション <span style="opacity:.75;font-size:11px;margin-left:auto">${comboText(bindings['chat.new'])}</span></button>
-    <button class="sb-search" onClick=${() => store.set({ palette: true })}><${Icon} n="search" s=${14} /><span>裏セッションを探す</span><kbd>${comboText(bindings['palette.toggle'])}</kbd></button>
+    <button class="btn primary sb-new" onClick=${onNew}><${Icon} n="plus" s=${15} /> ${t('新しい裏セッション')} <span style="opacity:.75;font-size:11px;margin-left:auto">${comboText(bindings['chat.new'])}</span></button>
+    <button class="sb-search" onClick=${() => store.set({ palette: true })}><${Icon} n="search" s=${14} /><span>${t('裏セッションを探す')}</span><kbd>${comboText(bindings['palette.toggle'])}</kbd></button>
     <div class="sb-list" tabindex="0" data-list="1">
       ${st.bg.error && html`<div class="note" style="margin:8px 12px">${st.bg.error}</div>`}
-      ${g.needs.length > 0 && html`<${Group} id="g-needs" title="入力待ち" count=${g.needs.length}>${rows(g.needs)}</${Group}>`}
-      ${g.working.length > 0 && html`<${Group} id="g-working" title="作業中" count=${g.working.length}>${rows(g.working)}</${Group}>`}
-      ${g.error.length > 0 && html`<${Group} id="g-error" title="エラー" count=${g.error.length}>${rows(g.error)}</${Group}>`}
-      ${g.done.length > 0 && html`<${Group} id="g-done" title="完了（未読）" count=${g.done.length}>${rows(g.done)}</${Group}>`}
-      ${g.idle.length > 0 && html`<${Group} id="recent" title="最近" count=${g.idle.length}>
+      ${g.needs.length > 0 && html`<${Group} id="g-needs" title=${t('入力待ち')} count=${g.needs.length}>${rows(g.needs)}</${Group}>`}
+      ${g.working.length > 0 && html`<${Group} id="g-working" title=${t('作業中')} count=${g.working.length}>${rows(g.working)}</${Group}>`}
+      ${g.error.length > 0 && html`<${Group} id="g-error" title=${t('エラー')} count=${g.error.length}>${rows(g.error)}</${Group}>`}
+      ${g.done.length > 0 && html`<${Group} id="g-done" title=${t('完了（未読）')} count=${g.done.length}>${rows(g.done)}</${Group}>`}
+      ${g.idle.length > 0 && html`<${Group} id="recent" title=${t('最近')} count=${g.idle.length}>
         ${rows(recent)}
-        ${g.idle.length > 15 && html`<button class="sb-more" onClick=${() => store.set({ showAllRecent: !st.showAllRecent })}>${st.showAllRecent ? '少なく表示' : `ほか ${g.idle.length - 15} 件を表示`}</button>`}
+        ${g.idle.length > 15 && html`<button class="sb-more" onClick=${() => store.set({ showAllRecent: !st.showAllRecent })}>${st.showAllRecent ? t('少なく表示') : tt(`ほか ${g.idle.length - 15} 件を表示`, `Show ${g.idle.length - 15} more`)}</button>`}
       </${Group}>`}
-      ${st.bg.loaded && !st.bg.list.length && !st.bg.error && html`<div class="sb-empty">裏セッションはまだありません。<br />「新しい裏セッション」か、ターミナルで <span class="mono">claude --bg</span> を使って始めると、ここに出ます。</div>`}
-      ${!st.bg.loaded && !st.bg.error && html`<div class="sb-empty"><span class="spinner" style="width:10px;height:10px;margin-right:6px"></span>claude agents を読んでいます…</div>`}
+      ${st.bg.loaded && !st.bg.list.length && !st.bg.error && html`<div class="sb-empty">${t('裏セッションはまだありません。')}<br />${tt('「新しい裏セッション」か、ターミナルで ', 'Start one with "New background session", or run ')}<span class="mono">claude --bg</span>${tt(' を使って始めると、ここに出ます。', ' in a terminal, and it will appear here.')}</div>`}
+      ${!st.bg.loaded && !st.bg.error && html`<div class="sb-empty"><span class="spinner" style="width:10px;height:10px;margin-right:6px"></span>${t('claude agents を読んでいます…')}</div>`}
     </div>
     <div class="sb-foot">
-      <button class="icon-btn sm" title=${`設定（${comboText(bindings['settings.open'])}）`} onClick=${() => store.set({ dialog: { tab: 'general' } })}><${Icon} n="settings" s=${15} /></button>
-      <span class="ver" title="裏セッションを動かしている claude（ターミナルの claude と同じもの）">Claude Code ${st.update?.current ?? '?'}</span>
+      <button class="icon-btn sm" title=${tt(`設定（${comboText(bindings['settings.open'])}）`, `Settings (${comboText(bindings['settings.open'])})`)} onClick=${() => store.set({ dialog: { tab: 'general' } })}><${Icon} n="settings" s=${15} /></button>
+      <span class="ver" title=${tt('裏セッションを動かしている claude（ターミナルの claude と同じもの）', 'The claude running the background sessions (the same one as in the terminal)')}>Claude Code ${st.update?.current ?? '?'}</span>
       <${UpdatePill} />
-      ${!st.connected && html`<span class="tag" style="color:var(--amber)">再接続中</span>`}
+      ${!st.connected && html`<span class="tag" style="color:var(--amber)">${t('再接続中')}</span>`}
     </div>
   </aside>`;
 }
@@ -148,32 +149,32 @@ export function Peek({ onOpen, onReply, onStop, onTerminal, bindings }) {
     <div class="peek-head">
       ${v === 'working' || v === 'sending' ? html`<span class="spinner" style="color:var(--blue)"></span>` : html`<span class=${`dot ${v}`}></span>`}
       <span class="title ellipsis">${a.title}</span>
-      ${STATUS_LABEL[v] && html`<span class=${`pill ${v}`}>${STATUS_LABEL[v]}</span>`}
-      <button class="icon-btn sm" title="閉じる（Esc）" onClick=${() => store.set({ peek: null })}><${Icon} n="x" s=${14} /></button>
+      ${statusLabel(v) && html`<span class=${`pill ${v}`}>${statusLabel(v)}</span>`}
+      <button class="icon-btn sm" title=${tt('閉じる（Esc）', 'Close (Esc)')} onClick=${() => store.set({ peek: null })}><${Icon} n="x" s=${14} /></button>
     </div>
     <div class="peek-meta">
       <span><${Icon} n="folder" s=${12} /> ${basename(a.cwd)}</span>
       <span class="mono">claude --bg · ${a.id}</span>
       ${v === 'working' && a.activity ? html`<span class="ellipsis">· ${a.activity}</span>` : ''}
-      ${a.bgBusy ? html`<span>· 裏でコマンドが動いています</span>` : ''}
+      ${a.bgBusy ? html`<span>· ${t('裏でコマンドが動いています')}</span>` : ''}
     </div>
     <div class="peek-body">
       <${BgPendingCard} a=${a} compact=${true} onReply=${(t) => onReply(a, t).catch((e) => toast(e.message, 'error'))} onTerminal=${() => onTerminal(a)} />
-      ${a.queue?.length > 0 && html`<div class="peek-user">送る予定: <b>${plainPreview(a.queue.join(' / '), 160)}</b></div>`}
-      ${a.lastUser && html`<div class="peek-user">あなた: <b>${plainPreview(a.lastUser, 160)}</b></div>`}
+      ${a.queue?.length > 0 && html`<div class="peek-user">${tt('送る予定: ', 'Queued: ')}<b>${plainPreview(a.queue.join(' / '), 160)}</b></div>`}
+      ${a.lastUser && html`<div class="peek-user">${t('あなた: ')}<b>${plainPreview(a.lastUser, 160)}</b></div>`}
       ${a.lastText ? html`<div class="peek-last"><${Markdown} text=${a.lastText.length > 4000 ? `${a.lastText.slice(0, 4000)}…` : a.lastText} /></div>`
-        : html`<div class="muted" style="font-size:12.5px">${v === 'working' || v === 'sending' ? '作業しています…' : 'まだ返事はありません'}</div>`}
+        : html`<div class="muted" style="font-size:12.5px">${v === 'working' || v === 'sending' ? t('作業しています…') : t('まだ返事はありません')}</div>`}
       ${a.lastError && html`<div class="msg-note error">${a.lastError}</div>`}
     </div>
     <div class="peek-reply" onFocusIn=${pin}>
-      <${Composer} id=${`peek-${a.id}`} minimal=${true} working=${v === 'working'} bindings=${bindings} stopTitle="止める"
-        placeholder=${v === 'working' ? `終わったら送る（${comboText(bindings['composer.send'])}）` : `返信（${comboText(bindings['composer.send'])}）`}
+      <${Composer} id=${`peek-${a.id}`} minimal=${true} working=${v === 'working'} bindings=${bindings} stopTitle=${t('止める')}
+        placeholder=${v === 'working' ? tt(`終わったら送る（${comboText(bindings['composer.send'])}）`, `Send when done (${comboText(bindings['composer.send'])})`) : tt(`返信（${comboText(bindings['composer.send'])}）`, `Reply (${comboText(bindings['composer.send'])})`)}
         onSend=${(t, now) => onReply(a, t, now)} onInterrupt=${() => onStop(a)} />
     </div>
     <div class="peek-foot">
-      <button class="btn sm primary" onClick=${() => onOpen(pk.key)}><${Icon} n="message" s=${13} /> 開く</button>
-      <button class="btn sm" onClick=${() => onTerminal(a)}><${Icon} n="terminal" s=${13} /> ターミナルで開く</button>
-      ${v === 'working' && html`<button class="btn sm" onClick=${() => onStop(a)}><${Icon} n="stop" s=${12} /> 止める</button>`}
+      <button class="btn sm primary" onClick=${() => onOpen(pk.key)}><${Icon} n="message" s=${13} /> ${t('開く')}</button>
+      <button class="btn sm" onClick=${() => onTerminal(a)}><${Icon} n="terminal" s=${13} /> ${t('ターミナルで開く')}</button>
+      ${v === 'working' && html`<button class="btn sm" onClick=${() => onStop(a)}><${Icon} n="stop" s=${12} /> ${t('止める')}</button>`}
     </div>
   </div>`;
 }

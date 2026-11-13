@@ -7,6 +7,7 @@ import { comboOf, comboText } from './keys.js';
 import { store, toast } from './store.js';
 import { api } from './api.js';
 import { EFFORTS, MODES, basename, effortLabel, modeLabel, modelLabel } from './util.js';
+import { t, tt } from './i18n.js';
 
 const html = htm.bind(h);
 const textDrafts = new Map();
@@ -20,25 +21,25 @@ export function openMenu(e, items, align = 'left') {
 export function OptionButtons({ opts, set, models, defaults, live }) {
   const dm = defaults || {};
   const modelItems = [
-    { label: `既定（${modelLabel(models, dm.model) || dm.model || '設定どおり'}）`, checked: !opts.model, onSelect: () => set({ model: '' }) },
+    { label: tt(`既定（${modelLabel(models, dm.model) || dm.model || t('設定どおり')}）`, `Default (${modelLabel(models, dm.model) || dm.model || t('設定どおり')})`), checked: !opts.model, onSelect: () => set({ model: '' }) },
     'sep',
     ...models.map((m) => ({ label: m.label, desc: m.description, checked: opts.model === m.value, onSelect: () => set({ model: m.value }) })),
   ];
   const modeItems = [
-    { label: `既定（${modeLabel(dm.mode) || '設定どおり'}）`, checked: !opts.mode, disabled: live, onSelect: () => set({ mode: '' }) },
+    { label: tt(`既定（${modeLabel(dm.mode) || t('設定どおり')}）`, `Default (${modeLabel(dm.mode) || t('設定どおり')})`), checked: !opts.mode, disabled: live, onSelect: () => set({ mode: '' }) },
     'sep',
-    ...MODES.map((m) => ({ label: m.label, desc: m.desc, checked: opts.mode === m.value, onSelect: () => set({ mode: m.value }) })),
+    ...MODES.map((m) => ({ label: t(m.label), desc: t(m.desc), checked: opts.mode === m.value, onSelect: () => set({ mode: m.value }) })),
   ];
   const effortItems = [
-    { label: `既定（${effortLabel(dm.effort) || '自動'}）`, checked: !opts.effort, onSelect: () => set({ effort: '' }) },
+    { label: tt(`既定（${effortLabel(dm.effort) || t('自動')}）`, `Default (${effortLabel(dm.effort) || t('自動')})`), checked: !opts.effort, onSelect: () => set({ effort: '' }) },
     'sep',
-    ...EFFORTS.map((x) => ({ label: x.label, checked: opts.effort === x.value, onSelect: () => set({ effort: x.value }) })),
+    ...EFFORTS.map((x) => ({ label: t(x.label), checked: opts.effort === x.value, onSelect: () => set({ effort: x.value }) })),
   ];
   const modeNow = opts.mode || dm.mode;
   return html`
-    <button class="cbtn" title="モデル" onClick=${(e) => openMenu(e, [{ header: 'モデル' }, ...modelItems])}><${Icon} n="sparkle" s=${14} /><span>${modelLabel(models, opts.model || dm.model) || '既定のモデル'}</span></button>
-    <button class="cbtn" title="思考の深さ" onClick=${(e) => openMenu(e, [{ header: '思考の深さ（effort）' }, ...effortItems])}><${Icon} n="gauge" s=${14} /><span>思考 ${effortLabel(opts.effort || dm.effort) || '自動'}</span></button>
-    <button class=${`cbtn${modeNow === 'bypassPermissions' ? ' warn' : ''}`} title="権限" onClick=${(e) => openMenu(e, [{ header: '権限' }, ...modeItems])}><${Icon} n="shield" s=${14} /><span>${opts.mode ? modeLabel(opts.mode) : `既定（${modeLabel(dm.mode)}）`}</span></button>`;
+    <button class="cbtn" title=${t('モデル')} onClick=${(e) => openMenu(e, [{ header: t('モデル') }, ...modelItems])}><${Icon} n="sparkle" s=${14} /><span>${modelLabel(models, opts.model || dm.model) || t('既定のモデル')}</span></button>
+    <button class="cbtn" title=${t('思考の深さ')} onClick=${(e) => openMenu(e, [{ header: t('思考の深さ（effort）') }, ...effortItems])}><${Icon} n="gauge" s=${14} /><span>${tt(`思考 ${effortLabel(opts.effort || dm.effort) || t('自動')}`, `Thinking ${effortLabel(opts.effort || dm.effort) || t('自動')}`)}</span></button>
+    <button class=${`cbtn${modeNow === 'bypassPermissions' ? ' warn' : ''}`} title=${t('権限')} onClick=${(e) => openMenu(e, [{ header: t('権限') }, ...modeItems])}><${Icon} n="shield" s=${14} /><span>${opts.mode ? modeLabel(opts.mode) : tt(`既定（${modeLabel(dm.mode)}）`, `Default (${modeLabel(dm.mode)})`)}</span></button>`;
 }
 
 export function Composer({ id, working, bindings, onSend, onInterrupt, bar, placeholder, autoFocus, cards, minimal, hint, stopTitle }) {
@@ -80,7 +81,7 @@ export function Composer({ id, working, bindings, onSend, onInterrupt, bar, plac
   };
   // 文はコマンドの引数で渡すので、画像は付けられない
   const onPaste = (e) => {
-    if ([...(e.clipboardData?.items || [])].some((i) => i.kind === 'file')) toast('画像やファイルは付けられません（ファイルのパスを書いてください）');
+    if ([...(e.clipboardData?.items || [])].some((i) => i.kind === 'file')) toast(t('画像やファイルは付けられません（ファイルのパスを書いてください）'));
   };
   const canSend = !!text.trim();
   return html`<div class="composer-inner">
@@ -98,12 +99,12 @@ export function Composer({ id, working, bindings, onSend, onInterrupt, bar, plac
         ${bar}
         <span class="grow"></span>
         ${working && !canSend
-          ? html`<button class="send-btn stop" title=${`${stopTitle || '止める'}（${comboText(bindings['session.interrupt'])}）`} onClick=${onInterrupt}><${Icon} n="stop" s=${14} /></button>`
-          : html`<button class="send-btn" disabled=${!canSend} title=${`送信（${comboText(bindings['composer.send'])}）`} onClick=${() => submit(false)}><${Icon} n="arrowUp" s=${16} sw=${2.2} /></button>`}
+          ? html`<button class="send-btn stop" title=${tt(`${stopTitle || t('止める')}（${comboText(bindings['session.interrupt'])}）`, `${stopTitle || t('止める')} (${comboText(bindings['session.interrupt'])})`)} onClick=${onInterrupt}><${Icon} n="stop" s=${14} /></button>`
+          : html`<button class="send-btn" disabled=${!canSend} title=${tt(`送信（${comboText(bindings['composer.send'])}）`, `Send (${comboText(bindings['composer.send'])})`)} onClick=${() => submit(false)}><${Icon} n="arrowUp" s=${16} sw=${2.2} /></button>`}
       </div>
     </div>
     ${!minimal && html`<div class="composer-hint">
-      <span>${comboText(bindings['composer.send'])} で送信${working ? ` ・ 作業中に送ると、今の作業が終わってから送ります（${comboText(bindings['composer.steer'])} なら止めて今すぐ）` : ''}</span>
+      <span>${tt(`${comboText(bindings['composer.send'])} で送信`, `${comboText(bindings['composer.send'])} to send`)}${working ? tt(` ・ 作業中に送ると、今の作業が終わってから送ります（${comboText(bindings['composer.steer'])} なら止めて今すぐ）`, ` · While working, a send waits until the current work finishes (${comboText(bindings['composer.steer'])} stops it and sends now)`) : ''}</span>
       ${hint && html`<span>${hint}</span>`}
     </div>`}
   </div>`;
@@ -148,9 +149,9 @@ export function FolderPicker({ value, onPick, onClose }) {
           } else if (e.key === 'Escape') { e.stopPropagation(); onClose(); }
         }} />
     </div>
-    <div class="menu-label">${q && q !== value ? 'フォルダ（Tab で中に入る）' : '最近のフォルダ'}</div>
+    <div class="menu-label">${q && q !== value ? t('フォルダ（Tab で中に入る）') : t('最近のフォルダ')}</div>
     ${list.map((d, i) => html`<button class=${`menu-item${i === act ? ' active' : ''}`} onMouseEnter=${() => setAct(i)} onClick=${() => pick(d)}>
       <${Icon} n="folder" s=${15} /><span class="ellipsis">${basename(d)}</span><span class="muted ellipsis" style="font-size:11px;max-width:300px">${d}</span></button>`)}
-    ${!list.length && html`<div class="menu-label" style="font-weight:400">${res.exists ? 'Enter でこのフォルダを使う' : '見つかりません'}</div>`}
+    ${!list.length && html`<div class="menu-label" style="font-weight:400">${res.exists ? t('Enter でこのフォルダを使う') : t('見つかりません')}</div>`}
   </div>`;
 }
