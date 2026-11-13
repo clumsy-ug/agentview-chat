@@ -6,7 +6,7 @@ A Windows app for viewing and replying to Claude Code background sessions (`clau
 
 Also available as a free skill on Agensi: https://www.agensi.io/skills/agentview-chat
 
-![The terminal agent view and this app handling the same background sessions](docs/demo.gif)
+![The terminal agent view and this app handling the same background sessions](docs/demo.en.gif)
 
 You can already watch and reply to background sessions from the terminal agent view (`claude agents`). But it is a terminal screen: the list is one-line summaries, and reading a conversation or answering it means keyboard work. I built this to do the same thing in a **chat UI**. Conversations read like a normal chat, with tables and code blocks rendered properly. Questions can be answered by clicking an option, and replies are just typed into a box and sent.
 
